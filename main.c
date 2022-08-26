@@ -27,6 +27,7 @@ RTC Connections: (+)->5V (-)->GND D->PB7 (I2C1_SDA) C->PB6 (I2C1_SCL)
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,7 +55,8 @@ typedef struct {
 //TO DO:
 //TASK 4
 //Define the RTC slave address
-#define DS3231_ADDRESS 0x0
+ // 7 bit address shifted for space for r/w bit
+#define DS3231_ADDRESS (0b110100 << 1)
 
 #define EPOCH_2022 1640988000
 /* USER CODE END PD */
@@ -381,6 +383,15 @@ uint8_t decToBcd(int val)
 	//TASK 3
 
 	//YOUR CODE HERE
+  int digits = floor(log10(val)) + 1;
+  uint8_t out = 0;
+  for (int i = digits -1; i >= 0; i--){
+      int digit = floor (val/ pow(10, i));
+      val -= floor(digit * pow(10, i));
+      out = out | digit << 4*i;
+  }
+    
+    return out;
 }
 
 int bcdToDec(uint8_t val)
@@ -391,6 +402,12 @@ int bcdToDec(uint8_t val)
 	//Complete the BCD to decimal function
 
 	//YOUR CODE HERE
+  int result = 0; // Uint8_t is 1 byte so 2 digits stored here in val
+  for (int i = 0; i < 2; i++){
+    result += (val >> 4*i & 15) * pow(10, i);
+
+  }
+  return result;
 
 }
 

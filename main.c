@@ -27,7 +27,6 @@ RTC Connections: (+)->5V (-)->GND D->PB7 (I2C1_SDA) C->PB6 (I2C1_SCL)
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
-#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,8 +54,7 @@ typedef struct {
 //TO DO:
 //TASK 4
 //Define the RTC slave address
- // 7 bit address shifted for space for r/w bit
-#define DS3231_ADDRESS (0b110100 << 1)
+#define DS3231_ADDRESS 0b11010000
 
 #define EPOCH_2022 1640988000
 /* USER CODE END PD */
@@ -114,7 +112,8 @@ int main(void){
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+
+ HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -147,7 +146,7 @@ int main(void){
   /* USER CODE BEGIN WHILE */
 
 
-
+  setTime(45, 31, 17, 3, 13, 9, 22);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -160,19 +159,30 @@ int main(void){
 	//TO DO:
 	//TASK 6
 
-	//sprintf(buffer, "%d \r\n", 55555555555555);
+
 	//This creates a string "55555555555555" with a pointer called buffer
 
 	//Transmit data via UART
 	//Blocking! fine for small buffers
-	//HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
 
 
 
 	//YOUR CODE HERE
 
+	getTime();
+	int s = epochFromTime(time);
 
 
+	//real time
+	sprintf(buffer, "%d-%d-%d \r\n", time.year, time.month, time.dayofmonth);
+	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
+
+	sprintf(buffer, "%d:%d:%d \r\n", time.hour, time.minutes, time.seconds);
+	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
+
+	//epoch
+	sprintf(buffer, "%d \r\n\n", s);
+	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
     /* USER CODE BEGIN 3 */
  }
   /* USER CODE END 3 */
@@ -383,15 +393,16 @@ uint8_t decToBcd(int val)
 	//TASK 3
 
 	//YOUR CODE HERE
-  int digits = floor(log10(val)) + 1;
-  uint8_t out = 0;
-  for (int i = digits -1; i >= 0; i--){
-      int digit = floor (val/ pow(10, i));
-      val -= floor(digit * pow(10, i));
-      out = out | digit << 4*i;
-  }
-    
-    return out;
+	 int digits = floor(log10(val)) + 1;
+	  uint8_t out = 0;
+	  for (int i = digits -1; i >= 0; i--){
+	      int digit = floor (val/ pow(10, i));
+	      val -= floor(digit * pow(10, i));
+	      out = out | digit << 4*i;
+	  }
+
+	    return out;
+
 }
 
 int bcdToDec(uint8_t val)
@@ -402,12 +413,12 @@ int bcdToDec(uint8_t val)
 	//Complete the BCD to decimal function
 
 	//YOUR CODE HERE
-  int result = 0; // Uint8_t is 1 byte so 2 digits stored here in val
-  for (int i = 0; i < 2; i++){
-    result += (val >> 4*i & 15) * pow(10, i);
+	 int result = 0; // Uint8_t is 1 byte so 2 digits stored here in val
+	  for (int i = 0; i < 2; i++){
+	    result += (val >> 4*i & 15) * pow(10, i);
 
-  }
-  return result;
+	  }
+	  return result;
 
 }
 
@@ -416,15 +427,22 @@ void setTime (uint8_t sec, uint8_t min, uint8_t hour, uint8_t dow, uint8_t dom, 
     /* Write the time to the RTC using I2C */
 	//TO DO:
 	//TASK 4
-
+	//YOUR CODE HERE
 	uint8_t set_time[7];
 
-	//YOUR CODE HERE
+	set_time[0] = decToBcd(sec);
+	set_time[1] = decToBcd(min);
+	set_time[2] = decToBcd(hour);
+	set_time[3] = decToBcd(dow);
+	set_time[4] = decToBcd(dom);
+	set_time[5] = decToBcd(month);
+	set_time[6] = decToBcd(year);
+
 
 	//fill in the address of the RTC, the address of the first register to write anmd the size of each register
 	//The function and RTC supports multiwrite. That means we can give the function a buffer and first address
 	//and it will write 1 byte of data, increment the register address, write another byte and so on
-	//HAL_I2C_Mem_Write(&hi2c1, DS3231_ADDRESS, FIRST_REG, REG_SIZE, set_time, 7, 1000);
+	HAL_I2C_Mem_Write(&hi2c1, DS3231_ADDRESS, 0x00, 1, set_time, 7, 1000);
 
 }
 
@@ -440,10 +458,17 @@ void getTime (void)
 	//fill in the address of the RTC, the address of the first register to write anmd the size of each register
 	//The function and RTC supports multiread. That means we can give the function a buffer and first address
 	//and it will read 1 byte of data, increment the register address, write another byte and so on
-	//HAL_I2C_Mem_Read(&hi2c1, DS3231_ADDRESS, FIRST_REG, REG_SIZE, get_time, 7, 1000);
+	HAL_I2C_Mem_Read(&hi2c1, DS3231_ADDRESS,  0x00, 1, get_time, 7, 1000);
 
 
 	//YOUR CODE HERE
+	time.seconds = bcdToDec(get_time[0]);
+	time.minutes = bcdToDec(get_time[1]);
+	time.hour = bcdToDec(get_time[2]);
+	time.dayofweek = bcdToDec(get_time[3]);
+	time.dayofmonth = bcdToDec(get_time[4]);
+	time.month = bcdToDec(get_time[5]);
+	time.year = bcdToDec(get_time[6]);
 
 }
 
@@ -463,23 +488,11 @@ int epochFromTime(TIME time){
 	{
 		numDays = numDays + daysOfMonth[i];
 	}
-	int numYears = time.year - 2022;
+	int numYears = time.year - 22;
 
 	int EpochTime = numYears*365*24*60*60 + numDays*24*60*60 +
 			time.hour*60*60 + time.minutes*60 + time.seconds;
 
-	//switch(months){
-	//case 1:
-		//day += 31;
-	//break;
-
-	/*
-	 *COMPLETE THE SWITCH CASE OR INSERT YOUR OWN LOGIC
-	 */
-
-	//default:
-		//day = day;
-	//}
 
 	return EPOCH_2022 + EpochTime;
 }
